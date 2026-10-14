@@ -1,5 +1,6 @@
 import { KnotEditor, type EngineId, type ExportScale } from './knot/editor';
 import { composeShareLink, parseShareLink } from './knot/shareLink';
+import { parseFile, serializeToFile } from './knot/saveLoad';
 
 const editor = new KnotEditor(document.getElementById('knot-canvas') as HTMLCanvasElement);
 
@@ -124,6 +125,78 @@ $('share-link').addEventListener('click', () => {
   void clipboard.writeText(link).catch(() => {
     // Clipboard write refused (permissions, insecure context): nothing to do.
   });
+});
+
+// ---- pattern files ----
+
+/** Trigger a browser download of `text` as a named file. */
+function downloadTextFile(text: string, filename: string, mimeType: string): void {
+  const blob = new Blob([text], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
+/**
+ * Save the live pattern to a `.json` file the user can keep, diff or share.
+ *
+ * The file carries the same two halves a share link does — engine id plus the
+ * engine's opaque pattern — so loading one restores the pattern exactly, grid
+ * size included (`loadPattern` follows the pattern's own dimensions).
+ */
+$('save-pattern').addEventListener('click', () => {
+  downloadTextFile(
+    serializeToFile(editor.getEngineId(), editor.getPattern()),
+    'celtic-knot-pattern.json',
+    'application/json',
+  );
+});
+
+/**
+ * Load a `.json` pattern file the user picked.
+ *
+ * Reversible by construction: the button only opens the file chooser, so
+ * nothing changes until a file is actually chosen and parses. A file that is
+ * malformed — or names an engine this build does not know — is ignored
+ * outright, leaving the current pattern on screen; an alert would break a
+ * button the user just pressed on purpose, and an unhandled rejection in a
+ * click handler is worse than a load that silently didn't happen.
+ */
+function loadPatternFile(file: File): void {
+  const reader = new FileReader();
+  reader.addEventListener('load', () => {
+    const parsed = parseFile(String(reader.result));
+    if (parsed === null || (parsed.engine !== 'cut-parity' && parsed.engine !== 'side-state')) {
+      console.warn('Ignoring malformed pattern file');
+      return;
+    }
+    editor.loadPattern(parsed.engine, parsed.pattern);
+    syncControls();
+    syncEngineSelect();
+  });
+  reader.addEventListener('error', () => {
+    // Unreadable file (permissions, it vanished mid-read): nothing to do.
+  });
+  reader.readAsText(file);
+}
+
+$('load-pattern').addEventListener('click', () => {
+  $<HTMLInputElement>('load-pattern-file').click();
+});
+
+$<HTMLInputElement>('load-pattern-file').addEventListener('change', (event) => {
+  const input = event.target as HTMLInputElement;
+  const file = input.files?.[0];
+  // Reset first so picking the same file twice in a row still fires `change`.
+  input.value = '';
+  if (file !== undefined) {
+    loadPatternFile(file);
+  }
 });
 
 // ---- keyboard shortcuts ----
