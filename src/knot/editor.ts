@@ -7,6 +7,7 @@ import {
 } from './types';
 import { renderGrid } from './render';
 import { CutParityEngine } from './engines/cutParity';
+import { SideStateEngine } from './engines/sideState';
 import { UndoStack } from './undo';
 import type { EditorHit, EngineImageSize, KnotEngine } from './engines/types';
 
@@ -21,6 +22,13 @@ export interface ImageDimensions {
 export type ExportScale = 1 | 2 | 4;
 
 /**
+ * Every pluggable engine the editor knows about. Kept as a literal union
+ * (not `KnotEngine['id']`) so `setEngine` can be driven by a `<select>` value
+ * while still being checked at compile time.
+ */
+export type EngineId = 'cut-parity' | 'side-state';
+
+/**
  * Pixels of pointer travel that still count as a plain click rather than a
  * drag. Real hands jitter a few pixels between press and release; without a
  * threshold that noise would turn every click into a spurious drag-cut.
@@ -31,15 +39,37 @@ const DRAG_THRESHOLD = 4;
  * A Celtic knot generator + pattern editor bound to one canvas.
  *
  * The editor owns the canvas, the `KnotSettings` and the export plumbing; the
- * pattern itself lives behind a `KnotEngine`. Today there is exactly one
- * engine (`cut-parity`: a grid of cuts between strands, edited through control
- * nodes) but the seam is the point — a second engine plugs in without touching
- * this class.
+ * pattern itself lives behind a `KnotEngine`. There are two engines —
+ * `cut-parity` (a grid of cuts between strands, edited through control nodes)
+ * and `side-state` (chip carving, clicked one lattice edge at a time) — and
+ * the editor keeps a live instance of each so switching engines preserves the
+ * pattern that engine had.
+ *
+ * The undo stack is engine-agnostic in code but engine-specific in data: a
+ * snapshot is opaque JSON for whichever engine produced it, so `setEngine`
+ * clears it rather than let a cross-engine undo deserialize the wrong shape.
  */
 export class KnotEditor {
   private canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D;
   private settings: KnotSettings;
+
+  /**
+   * Engine instances, created on first use (see `setEngine`) and kept alive
+   * for the editor's lifetime so each retains its own pattern.
+   */
+  private readonly engines = new Map<EngineId, KnotEngine>();
+
+  /**
+   * Grid dimensions each known engine was last sized to.
+   *
+   * `resize()` rebuilds the pattern from scratch, so it must not be called on
+   * a merely inactive engine — that would throw away the pattern the user left
+   * there. Only an engine whose recorded size differs from `settings` (a
+   * brand-new one, or one that sat out a grid resize) gets resized.
+   */
+  private readonly engineSizes = new Map<EngineId, { rows: number; columns: number }>();
+
   private engine: KnotEngine;
   private readonly undoStack = new UndoStack<unknown>();
 
@@ -58,7 +88,11 @@ export class KnotEditor {
     }
     this.ctx = ctx;
     this.settings = { ...DEFAULT_SETTINGS, ...overrides };
+
+    // cut-parity is the default: a fresh load must behave exactly like 1.0,
+    // so it is the one engine constructed eagerly.
     this.engine = new CutParityEngine();
+    this.engines.set('cut-parity', this.engine);
 
     this.setKnotworkSize(this.settings.rows, this.settings.columns);
     this.bindEvents();
@@ -68,6 +102,46 @@ export class KnotEditor {
   /** The active engine. */
   getEngine(): KnotEngine {
     return this.engine;
+  }
+
+  /** Id of the active engine. `cut-parity` until something switches it. */
+  getEngineId(): EngineId {
+    return this.engine.id;
+  }
+
+  /**
+   * Switch the active engine.
+   *
+   * Each engine is instantiated once and kept in `engines`, so the pattern the
+   * incoming engine had is untouched — switching back restores it exactly.
+   * The new engine is resized only when its grid does not match the current
+   * dimensions (a lazily created engine, or one that sat out a grid resize);
+   * resizing an already-correct engine would blank its pattern. The undo stack
+   * is cleared (its snapshots belong to the outgoing engine and would
+   * deserialize into the wrong shape) and the canvas is redrawn. Selecting the
+   * already-active engine is a no-op.
+   */
+  setEngine(id: EngineId): void {
+    if (id === this.engine.id) {
+      return;
+    }
+
+    let next = this.engines.get(id);
+    if (next === undefined) {
+      next = id === 'side-state' ? new SideStateEngine() : new CutParityEngine();
+      this.engines.set(id, next);
+    }
+
+    const size = this.engineSizes.get(id);
+    if (size === undefined || size.rows !== this.settings.rows || size.columns !== this.settings.columns) {
+      next.resize(this.settings.rows, this.settings.columns);
+      this.engineSizes.set(id, { rows: this.settings.rows, columns: this.settings.columns });
+    }
+
+    this.engine = next;
+    this.undoStack.clear();
+    this.gesture = null;
+    this.redraw();
   }
 
   // ---- events ----
@@ -228,6 +302,10 @@ export class KnotEditor {
     this.settings.columns = columns;
 
     this.engine.resize(rows, columns);
+    // Only the active engine is resized; the idle ones keep their patterns
+    // and are recorded as stale, so the next switch to one resizes it to the
+    // new grid.
+    this.engineSizes.set(this.engine.id, { rows, columns });
 
     // Resize the canvas to fit, never below the initial 600x500.
     const canvasWidth = Math.max(OUTPUT_OFFSET.x + columns * this.settings.cellSize + 15, MIN_CANVAS_WIDTH);

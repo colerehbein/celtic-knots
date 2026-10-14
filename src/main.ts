@@ -1,4 +1,4 @@
-import { KnotEditor, type ExportScale } from './knot/editor';
+import { KnotEditor, type EngineId, type ExportScale } from './knot/editor';
 
 const editor = new KnotEditor(document.getElementById('knot-canvas') as HTMLCanvasElement);
 
@@ -23,8 +23,27 @@ function syncControls(): void {
   $<HTMLInputElement>('background-color').value = editor.getBackgroundColor();
 }
 
+/** Push the editor's active engine back into the select. */
+function syncEngineSelect(): void {
+  $<HTMLSelectElement>('engine-select').value = editor.getEngineId();
+}
+
+/** Read the select as an engine id; anything unknown falls back to the default. */
+function readEngineId(): EngineId {
+  const value = $<HTMLSelectElement>('engine-select').value;
+  return value === 'side-state' ? 'side-state' : 'cut-parity';
+}
+
 $('reset-pattern').addEventListener('click', () => editor.resetPattern());
 $('randomize-pattern').addEventListener('click', () => editor.randomizePattern());
+
+// The engine select swaps the live engine. Each engine keeps its own pattern,
+// so switching back restores what was there; the undo stack is engine-specific
+// and is cleared by the editor.
+$<HTMLSelectElement>('engine-select').addEventListener('change', () => {
+  editor.setEngine(readEngineId());
+  syncEngineSelect();
+});
 $('close-border').addEventListener('click', () => editor.closeBorder());
 $('open-border').addEventListener('click', () => editor.openBorder());
 
@@ -162,3 +181,4 @@ document.addEventListener('keydown', (event) => {
 // Start with a random knot so the canvas isn't empty on load.
 editor.randomizePattern();
 syncControls();
+syncEngineSelect();
