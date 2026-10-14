@@ -17,6 +17,9 @@ export interface ImageDimensions {
   height: number;
 }
 
+/** Whole-number pixel multiples the export UI offers. 1x is the default. */
+export type ExportScale = 1 | 2 | 4;
+
 /**
  * A Celtic knot generator + pattern editor bound to one canvas.
  *
@@ -301,27 +304,31 @@ export class KnotEditor {
   // ---- export ----
 
   /** Render the knot alone (no editor UI) to a standalone offscreen canvas. */
-  private renderExportCanvas(): HTMLCanvasElement {
+  private renderExportCanvas(scale: ExportScale): HTMLCanvasElement {
     const s = this.settings;
     const out = document.createElement('canvas');
     const size: EngineImageSize = this.engine.imageSize(s);
-    out.width = size.width;
-    out.height = size.height;
+    out.width = size.width * scale;
+    out.height = size.height * scale;
     const ctx = out.getContext('2d');
     if (!ctx) {
       throw new Error('Export canvas 2D context unavailable');
     }
 
+    // Background covers the whole (scaled) bitmap, so paint it unscaled.
     ctx.fillStyle = s.backgroundColor;
     ctx.fillRect(0, 0, out.width, out.height);
+    // Scale the coordinate system so the engine's 1x geometry lands crisply
+    // at every pixel multiple.
+    ctx.scale(scale, scale);
     this.engine.render(ctx, s);
 
     return out;
   }
 
-  /** The knot as a PNG blob, without any editor overlay. */
-  toPNG(): Promise<Blob> {
-    const out = this.renderExportCanvas();
+  /** The knot as a PNG blob, without any editor overlay. Defaults to 1x. */
+  toPNG(scale: ExportScale = 1): Promise<Blob> {
+    const out = this.renderExportCanvas(scale);
     return new Promise((resolve, reject) => {
       out.toBlob((blob) => {
         if (blob) {
@@ -333,9 +340,9 @@ export class KnotEditor {
     });
   }
 
-  /** Trigger a browser download of the knot as a PNG. */
-  async downloadPNG(filename = 'celtic-knot.png'): Promise<void> {
-    const blob = await this.toPNG();
+  /** Trigger a browser download of the knot as a PNG. Defaults to 1x. */
+  async downloadPNG(filename = 'celtic-knot.png', scale: ExportScale = 1): Promise<void> {
+    const blob = await this.toPNG(scale);
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;

@@ -1,4 +1,4 @@
-import { KnotEditor } from './knot/editor';
+import { KnotEditor, type ExportScale } from './knot/editor';
 
 const editor = new KnotEditor(document.getElementById('knot-canvas') as HTMLCanvasElement);
 
@@ -72,8 +72,14 @@ $('background-color').addEventListener('input', (event) => {
   editor.setBackgroundColor((event.target as HTMLInputElement).value);
 });
 
+/** Export scales the UI offers; anything else falls back to 1x. */
+function readExportScale(): ExportScale {
+  const parsed = Number($<HTMLSelectElement>('export-scale').value);
+  return parsed === 2 || parsed === 4 ? parsed : 1;
+}
+
 $('download-image').addEventListener('click', () => {
-  void editor.downloadPNG();
+  void editor.downloadPNG('celtic-knot.png', readExportScale());
 });
 
 // ---- undo/redo keyboard shortcuts ----
