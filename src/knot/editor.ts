@@ -21,6 +21,13 @@ export interface ImageDimensions {
 export type ExportScale = 1 | 2 | 4;
 
 /**
+ * Pixels of pointer travel that still count as a plain click rather than a
+ * drag. Real hands jitter a few pixels between press and release; without a
+ * threshold that noise would turn every click into a spurious drag-cut.
+ */
+const DRAG_THRESHOLD = 4;
+
+/**
  * A Celtic knot generator + pattern editor bound to one canvas.
  *
  * The editor owns the canvas, the `KnotSettings` and the export plumbing; the
@@ -35,6 +42,13 @@ export class KnotEditor {
   private settings: KnotSettings;
   private engine: KnotEngine;
   private readonly undoStack = new UndoStack<unknown>();
+
+  /**
+   * Active pointer gesture, or null when no button is held. `hit` is the hit
+   * the pointer went down on; `pageX/pageY` are the press coordinates, used to
+   * tell a plain click from a drag.
+   */
+  private gesture: { pointerId: number; hit: EditorHit | null; pageX: number; pageY: number } | null = null;
 
   constructor(canvas: HTMLCanvasElement, overrides: Partial<KnotSettings> = {}) {
     this.canvas = canvas;
@@ -58,9 +72,18 @@ export class KnotEditor {
 
   // ---- events ----
 
+  /**
+   * Pointer Events replace mouse events wholesale: `pointerdown` fires the
+   * engine's click state machine once (1.0 semantics), `pointermove` drives
+   * hover preview, and `pointerup` completes a drag only when it landed on a
+   * *different* hit — a same-hit release is already handled by the down, so
+   * running the state machine again would select-then-deselect a plain click.
+   */
   private bindEvents(): void {
-    this.canvas.addEventListener('mousemove', (event) => this.onMouseMove(event));
-    this.canvas.addEventListener('click', (event) => this.onClick(event));
+    this.canvas.addEventListener('pointerdown', (event) => this.onPointerDown(event));
+    this.canvas.addEventListener('pointermove', (event) => this.onPointerMove(event));
+    this.canvas.addEventListener('pointerup', (event) => this.onPointerUp(event));
+    this.canvas.addEventListener('pointercancel', () => this.onPointerCancel());
   }
 
   private pageToCanvas(pageX: number, pageY: number): { x: number; y: number } {
@@ -71,7 +94,11 @@ export class KnotEditor {
     };
   }
 
-  private onMouseMove(event: MouseEvent): void {
+  /**
+   * Hover preview. Runs with no button held exactly like the old mousemove,
+   * and mid-drag so the preview line tracks the target node.
+   */
+  private onPointerMove(event: PointerEvent): void {
     if (!this.settings.showUi) {
       return;
     }
@@ -84,18 +111,70 @@ export class KnotEditor {
     }
   }
 
-  private onClick(event: MouseEvent): void {
+  private onPointerDown(event: PointerEvent): void {
     if (!this.settings.showUi) {
       return;
     }
 
     const position = this.pageToCanvas(event.pageX, event.pageY);
-    const hit: EditorHit | null = this.engine.hitTest(position.x, position.y, this.settings);
+    const hit = this.engine.hitTest(position.x, position.y, this.settings);
+
+    // The down IS the click: select / deselect / apply-cut / immediate bump.
+    this.applyEngineClick(hit);
+    this.gesture = { pointerId: event.pointerId, hit, pageX: event.pageX, pageY: event.pageY };
+
+    // Keep tracking this pointer after it leaves the canvas, so a drag that
+    // runs off the edge still reports its release.
+    if (typeof this.canvas.setPointerCapture === 'function') {
+      this.canvas.setPointerCapture(event.pointerId);
+    }
+  }
+
+  private onPointerUp(event: PointerEvent): void {
+    const gesture = this.gesture;
+    if (gesture === null || gesture.pointerId !== event.pointerId) {
+      return;
+    }
+    this.gesture = null;
+
+    const distance = Math.hypot(
+      event.pageX - gesture.pageX,
+      event.pageY - gesture.pageY,
+    );
+
+    // A press and release within DRAG_THRESHOLD is a plain click, and
+    // pointerdown already ran the engine's state machine for it — firing
+    // again would select-then-deselect (or bump a side twice). Only a real
+    // drag completes on release.
+    //
+    // Movement, not hit equality, is the discriminator: `hitTest` is
+    // stateful (once a node is selected, the same position re-tests as
+    // "not a valid target"), so comparing up/down hits would flag every
+    // ordinary click as a change.
+    if (distance <= DRAG_THRESHOLD) {
+      return;
+    }
+
+    const position = this.pageToCanvas(event.pageX, event.pageY);
+    const upHit = this.engine.hitTest(position.x, position.y, this.settings);
+    this.applyEngineClick(upHit);
+  }
+
+  private onPointerCancel(): void {
+    // The OS reclaimed the gesture (e.g. a touch became a scroll): drop the
+    // drag without applying anything. The pointerdown's cut stays.
+    this.gesture = null;
+  }
+
+  /**
+   * Run the engine's click state machine and record an undo step when the
+   * pattern actually changed. Only clicks that cut/erased a strand are
+   * undoable — a pure select/deselect is transient UI state. Comparing
+   * serialized state keeps this engine-agnostic.
+   */
+  private applyEngineClick(hit: EditorHit | null): void {
     const snapshot = this.engine.serialize();
     this.engine.onClick(hit, this.settings);
-    // Only clicks that actually cut/erased a strand are undoable — a pure
-    // select/deselect is transient UI state, not a pattern mutation.
-    // Compare serialized state so this works for any engine.
     if (JSON.stringify(this.engine.serialize()) !== JSON.stringify(snapshot)) {
       this.undoStack.record(snapshot);
     }

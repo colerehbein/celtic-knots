@@ -63,6 +63,8 @@ body {
   display: block;
   border: 1px solid #ddd;
   cursor: crosshair;
+  /* The editor handles its own drags — stop touch gestures scrolling the page. */
+  touch-action: none;
 }
 
 .clear {

@@ -21,8 +21,6 @@ interface CutParitySnapshot {
   cutRows: number;
   cutColumns: number;
   cuts: CutState[][];
-  selectedNode: KnotNode | null;
-  hoverNode: KnotNode | null;
 }
 
 /** Deterministic PRNG so `randomize(seed)` is repeatable across runs. */
@@ -35,14 +33,6 @@ function mulberry32(seed: number): () => number {
     t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
-}
-
-function isNode(value: unknown): value is KnotNode {
-  if (typeof value !== 'object' || value === null) {
-    return false;
-  }
-  const candidate = value as Partial<KnotNode>;
-  return typeof candidate.row === 'number' && typeof candidate.column === 'number';
 }
 
 function isCutState(value: unknown): value is CutState {
@@ -131,12 +121,12 @@ export class CutParityEngine implements KnotEngine {
   }
 
   serialize(): unknown {
+    // Pattern state only — selection/hover are transient UI state and must
+    // not leak into snapshots (they would make undo record pure selects).
     const snapshot: CutParitySnapshot = {
       cutRows: this.cutRows,
       cutColumns: this.cutColumns,
       cuts: this.cuts.map((row) => [...row]),
-      selectedNode: this.selectedNode === null ? null : { ...this.selectedNode },
-      hoverNode: this.hoverNode === null ? null : { ...this.hoverNode },
     };
     return snapshot;
   }
@@ -176,8 +166,10 @@ export class CutParityEngine implements KnotEngine {
     this.cutRows = candidate.cutRows;
     this.cutColumns = candidate.cutColumns;
     this.cuts = restored;
-    this.selectedNode = isNode(candidate.selectedNode) ? { ...candidate.selectedNode } : null;
-    this.hoverNode = isNode(candidate.hoverNode) ? { ...candidate.hoverNode } : null;
+    // Selection is transient UI state and deliberately not restored —
+    // a snapshot is a pattern.
+    this.selectedNode = null;
+    this.hoverNode = null;
   }
 
   imageSize(settings: KnotSettings): EngineImageSize {
