@@ -1,10 +1,26 @@
 # Celtic Knot Generator — TypeScript
 
+![Celtic knot banner](assets/banner.png)
+
 A Celtic knotwork generator and pattern editor, written in TypeScript with
 zero runtime dependencies.
 
 Inspired by Janis Elsts' original Celtic Knot Generator
 (w-shadow.com/celtic-knots). Independently reimplemented.
+
+## Try it
+
+**[Open `celtic-knots.html`](celtic-knots.html)** — a fully self-contained
+build. No server, no install, no build step: double-click it (or drag it
+into any browser) and it just runs, offline, in Chrome, Safari, Orion —
+anything.
+
+> Don't open the top-level `index.html` — that's the dev entry point and
+> only works through the dev server.
+
+![Screenshot](assets/screenshot.png)
+
+![Demo](assets/demo.gif)
 
 ## How it works
 
@@ -36,7 +52,7 @@ src/knot/
 pnpm install
 pnpm dev        # dev server
 pnpm test       # vitest — 20 tests over pattern + tile invariants
-pnpm build      # typecheck + production build (~14 kB JS, no dependencies)
+pnpm build      # typecheck + production build (also emits celtic-knots.html)
 pnpm preview    # serve the built app
 ```
 
@@ -46,5 +62,9 @@ pnpm preview    # serve the built app
 - String / stroke / background colors
 - Click-to-draw cuts on the control-node lattice (with hover preview)
 - Randomize (symmetric), reset, open/close border
-- Show/hide grid
+- Show/hide grid and editor overlay
 - PNG export of the knot alone (no editor overlay) via native `canvas.toBlob`
+
+## License
+
+MIT — see [LICENSE](LICENSE).
