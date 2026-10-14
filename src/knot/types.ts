@@ -33,6 +33,13 @@ export interface KnotSettings {
   showGrid: boolean;
   showUi: boolean;
 
+  /**
+   * Neon glow around the strands (canvas shadow). Off by default, and with
+   * it off the renderers issue no shadow calls at all — so the glow is a
+   * pure addition to the canvas call stream, never a change to it.
+   */
+  glow: boolean;
+
   controlNodeSize: number;
   selectedControlNodeSize: number;
 }
@@ -56,6 +63,8 @@ export const DEFAULT_SETTINGS: KnotSettings = {
 
   showGrid: true,
   showUi: true,
+
+  glow: false,
 
   controlNodeSize: 5,
   selectedControlNodeSize: 12,

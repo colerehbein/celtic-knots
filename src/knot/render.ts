@@ -70,6 +70,41 @@ export function renderKnotwork(ctx: CanvasRenderingContext2D, s: KnotSettings, c
   }
 }
 
+/** Canvas state that clears a strand glow: no shadow colour, no blur. */
+export const GLOW_OFF_COLOR = 'transparent';
+export const GLOW_OFF_BLUR = 0;
+
+/**
+ * Turn on the neon glow for the strands about to be drawn.
+ *
+ * A no-op unless `s.glow` — with the flag off nothing is written at all, so
+ * the canvas call stream is byte-for-byte what it was before the glow
+ * existed. The bracket's other half is `endGlow`.
+ */
+export function beginGlow(ctx: CanvasRenderingContext2D, s: KnotSettings): void {
+  if (!s.glow) {
+    return;
+  }
+  ctx.shadowColor = s.stringColor;
+  ctx.shadowBlur = s.stringSize / 2;
+}
+
+/**
+ * Close a `beginGlow` bracket. Always called by its owner (glow on or off),
+ * but only writes when the glow was actually on — so an engine rendering
+ * with glow off stays silent.
+ *
+ * The reset must happen before anything else draws (grid, overlay): a live
+ * shadow would put a halo on every later stroke, not just the strands.
+ */
+export function endGlow(ctx: CanvasRenderingContext2D, s: KnotSettings): void {
+  if (!s.glow) {
+    return;
+  }
+  ctx.shadowColor = GLOW_OFF_COLOR;
+  ctx.shadowBlur = GLOW_OFF_BLUR;
+}
+
 /** Faint cell grid shown behind the knot while editing. */
 export function renderGrid(ctx: CanvasRenderingContext2D, s: KnotSettings): void {
   ctx.strokeStyle = s.gridColor;

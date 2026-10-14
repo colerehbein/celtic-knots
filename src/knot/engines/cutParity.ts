@@ -12,6 +12,8 @@ import {
   renderControlNodes,
   renderCuts,
   renderKnotwork,
+  beginGlow,
+  endGlow,
 } from '../render';
 import { mulberry32 } from '../rng';
 import type { CutGrid, CutState, KnotNode, KnotSettings } from '../types';
@@ -104,7 +106,11 @@ export class CutParityEngine implements KnotEngine {
   // ---- KnotEngine ----
 
   render(ctx: CanvasRenderingContext2D, settings: KnotSettings): void {
+    // The glow brackets the knotwork only: `renderOverlay` (cut markers,
+    // control nodes) runs after this returns, so its strokes get no halo.
+    beginGlow(ctx, settings);
     renderKnotwork(ctx, settings, this.cuts);
+    endGlow(ctx, settings);
   }
 
   randomize(seed?: number): void {

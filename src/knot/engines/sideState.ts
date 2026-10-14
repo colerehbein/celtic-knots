@@ -1,4 +1,5 @@
 import { mulberry32 } from '../rng';
+import { beginGlow, endGlow } from '../render';
 import type { EditorHit, EditorUiState, EngineImageSize, KnotEngine } from './types';
 import type { KnotSettings } from '../types';
 
@@ -418,6 +419,9 @@ export class SideStateEngine implements KnotEngine {
     ctx.strokeStyle = settings.strokeColor;
     ctx.lineWidth = settings.strokeWidth;
 
+    // Glow brackets the draw loop only, so `renderOverlay`'s lattice and
+    // the editor's grid never pick up the halo.
+    beginGlow(ctx, settings);
     for (let row = 0; row < this.rows; row++) {
       for (let column = 0; column < this.columns; column++) {
         ctx.save();
@@ -426,6 +430,7 @@ export class SideStateEngine implements KnotEngine {
         ctx.restore();
       }
     }
+    endGlow(ctx, settings);
   }
 
   /**

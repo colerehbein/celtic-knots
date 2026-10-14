@@ -463,6 +463,16 @@ export class KnotEditor {
     this.redraw();
   }
 
+  /** Neon glow around the strands. Off by default; the toggle is reversible. */
+  showGlow(show: boolean): void {
+    this.settings.glow = show;
+    this.redraw();
+  }
+
+  isGlowEnabled(): boolean {
+    return this.settings.glow;
+  }
+
   isOverlayVisible(): boolean {
     return this.settings.showUi;
   }
