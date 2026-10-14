@@ -9,6 +9,7 @@ import { renderGrid } from './render';
 import { CutParityEngine } from './engines/cutParity';
 import { SideStateEngine } from './engines/sideState';
 import { UndoStack } from './undo';
+import { downloadBlob } from './download';
 import type { EditorHit, EngineImageSize, KnotEngine } from './engines/types';
 
 export interface ImageDimensions {
@@ -610,13 +611,6 @@ export class KnotEditor {
   /** Trigger a browser download of the knot as a PNG. Defaults to 1x. */
   async downloadPNG(filename = 'celtic-knot.png', scale: ExportScale = 1): Promise<void> {
     const blob = await this.toPNG(scale);
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = filename;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    URL.revokeObjectURL(url);
+    downloadBlob(blob, filename);
   }
 }

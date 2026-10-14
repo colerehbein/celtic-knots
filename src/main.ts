@@ -1,8 +1,17 @@
 import { KnotEditor, SIZE_PRESETS, type EngineId, type ExportScale } from './knot/editor';
 import { composeShareLink, parseShareLink } from './knot/shareLink';
 import { parseFile, serializeToFile } from './knot/saveLoad';
+import {
+  CAPTURE_FRAME_RATE,
+  RECORDING_MIME_TYPE,
+  downloadRecording,
+  isRecordingSupported,
+  recorderTransition,
+  type RecorderStatus,
+} from './knot/recorder';
 
-const editor = new KnotEditor(document.getElementById('knot-canvas') as HTMLCanvasElement);
+const canvas = document.getElementById('knot-canvas') as HTMLCanvasElement;
+const editor = new KnotEditor(canvas);
 
 const $ = <T extends HTMLElement>(id: string): T => document.getElementById(id) as T;
 
@@ -119,6 +128,88 @@ function readExportScale(): ExportScale {
 
 $('download-image').addEventListener('click', () => {
   void editor.downloadPNG('celtic-knot.png', readExportScale());
+});
+
+// ---- demo recording ----
+//
+// Records the live canvas to a WebM file via canvas.captureStream +
+// MediaRecorder. Two things are deliberate:
+//
+// - The output is WebM, not a GIF. No browser encodes GIF from a canvas
+//   stream, so the button, the tooltip and the filename all say `webm`
+//   rather than promise something the code cannot produce.
+// - Every click is checked against the current status before it does
+//   anything, and the status only ever moves through `recorderTransition`.
+//   `stop()` is asynchronous, so between the click and the `onstop` handler
+//   the recorder is `stopping`: a second click in that window must not
+//   restart capture or flush a half-built file.
+//
+// Unsupported browsers (anything without MediaRecorder) get the button
+// disabled up front — an explanation beats a dead click.
+
+const recordButton = $<HTMLButtonElement>('record-demo');
+let recorderStatus: RecorderStatus = 'idle';
+let recorder: MediaRecorder | null = null;
+let chunks: Blob[] = [];
+
+if (!isRecordingSupported()) {
+  recordButton.disabled = true;
+  recordButton.title = 'Recording needs a browser with MediaRecorder support (saves a .webm file)';
+}
+
+function setRecorderStatus(next: RecorderStatus): void {
+  recorderStatus = next;
+  recordButton.textContent = next === 'idle' ? 'Record demo' : 'Stop recording';
+}
+
+/**
+ * Start a fresh recording. Handlers are bound before `start()` so nothing
+ * can be missed, and the status transitions to `recording` before `start()`
+ * returns — otherwise a click landing inside that synchronous call would
+ * start a second recorder.
+ */
+function startRecording(): void {
+  const stream = canvas.captureStream(CAPTURE_FRAME_RATE);
+  const active = new MediaRecorder(stream, { mimeType: RECORDING_MIME_TYPE });
+  recorder = active;
+  chunks = [];
+
+  active.addEventListener('dataavailable', (event: BlobEvent) => {
+    if (event.data.size > 0) {
+      chunks.push(event.data);
+    }
+  });
+
+  active.addEventListener('stop', () => {
+    // Fired only after MediaRecorder has flushed its final chunks, so this
+    // Blob is the whole recording.
+    const blob = new Blob(chunks, { type: RECORDING_MIME_TYPE });
+    chunks = [];
+    recorder = null;
+    setRecorderStatus(recorderTransition(recorderStatus, 'done'));
+    void downloadRecording(blob);
+  });
+
+  setRecorderStatus(recorderTransition(recorderStatus, 'start'));
+  active.start();
+}
+
+recordButton.addEventListener('click', () => {
+  // The status is checked before anything is created, and it is the only
+  // thing that decides which branch runs — so a rapid double-click can
+  // never start two recorders. The second click lands either on `recording`
+  // (harmless second stop, ignored by the transition) or on `stopping`
+  // (nothing to do: the download is already in flight).
+  if (recorderStatus === 'idle') {
+    startRecording();
+    return;
+  }
+  if (recorderStatus === 'recording' && recorder !== null) {
+    // `stop()` returns immediately but `stop` fires later, so move to
+    // `stopping` here — that window is what keeps the next click inert.
+    setRecorderStatus(recorderTransition(recorderStatus, 'stop'));
+    recorder.stop();
+  }
 });
 
 // ---- share links ----
