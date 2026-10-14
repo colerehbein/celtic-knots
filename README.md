@@ -10,10 +10,11 @@ Inspired by Janis Elsts' original Celtic Knot Generator
 
 ## Try it
 
-**[Open `celtic-knots.html`](celtic-knots.html)** — a fully self-contained
-build. No server, no install, no build step: double-click it (or drag it
-into any browser) and it just runs, offline, in Chrome, Safari, Orion —
-anything.
+**Live: [celtic-knots.cole.press](https://celtic-knots.cole.press)**
+
+Or open `celtic-knots.html` locally — a fully self-contained build. No
+server, no install, no build step: double-click it (or drag it into any
+browser) and it just runs, offline, in Chrome, Safari, Orion — anything.
 
 > Don't open the top-level `index.html` — that's the dev entry point and
 > only works through the dev server.
