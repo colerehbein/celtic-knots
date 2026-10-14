@@ -294,6 +294,26 @@ export class KnotEditor {
     this.redraw();
   }
 
+  isOverlayVisible(): boolean {
+    return this.settings.showUi;
+  }
+
+  isGridVisible(): boolean {
+    return this.settings.showGrid;
+  }
+
+  /**
+   * Drop the engine's selection — the keyboard equivalent of clicking empty
+   * space. Selection is engine-owned state, so the editor cannot clear it
+   * directly; it asks the engine through the same `onClick` door the pointer
+   * path uses, which every engine already implements (engines without a
+   * selection concept treat it as a no-op).
+   */
+  deselect(): void {
+    this.engine.onClick({ node: null }, this.settings);
+    this.redraw();
+  }
+
   // ---- sizing ----
 
   setCellSize(size: number): void {

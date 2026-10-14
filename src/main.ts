@@ -82,6 +82,55 @@ $('download-image').addEventListener('click', () => {
   void editor.downloadPNG('celtic-knot.png', readExportScale());
 });
 
+// ---- keyboard shortcuts ----
+
+/**
+ * True when the event landed in a field the user is typing into. Typing 'r'
+ * in the grid-width box must randomize nothing, so every bare-key shortcut
+ * bows out here. Modifier combos are handled separately by the undo/redo
+ * listener below, which reuses this same guard.
+ */
+function isTypingTarget(target: EventTarget | null): boolean {
+  if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement) {
+    return true;
+  }
+  return target instanceof HTMLElement && target.isContentEditable;
+}
+
+/** Reflect an editor visibility flag back into its checkbox. */
+function syncCheckbox(id: string, checked: boolean): void {
+  const box = $<HTMLInputElement>(id);
+  box.checked = checked;
+}
+
+document.addEventListener('keydown', (event) => {
+  if (event.metaKey || event.ctrlKey || event.altKey) {
+    return;
+  }
+  if (isTypingTarget(event.target)) {
+    return;
+  }
+
+  switch (event.key) {
+    case 'r':
+      editor.randomizePattern();
+      break;
+    case 'Escape':
+      editor.deselect();
+      break;
+    case 'g':
+      editor.showGrid(!editor.isGridVisible());
+      syncCheckbox('show-grid', editor.isGridVisible());
+      break;
+    case 'u':
+      editor.showUi(!editor.isOverlayVisible());
+      syncCheckbox('show-overlay', editor.isOverlayVisible());
+      break;
+    default:
+      break;
+  }
+});
+
 // ---- undo/redo keyboard shortcuts ----
 
 document.addEventListener('keydown', (event) => {
@@ -93,8 +142,7 @@ document.addEventListener('keydown', (event) => {
   }
 
   // Don't hijack typing in text fields (grid width/height, etc.).
-  const target = event.target;
-  if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || (target instanceof HTMLElement && target.isContentEditable)) {
+  if (isTypingTarget(event.target)) {
     return;
   }
 
