@@ -3,27 +3,12 @@ import {
   MIN_CANVAS_HEIGHT,
   MIN_CANVAS_WIDTH,
   OUTPUT_OFFSET,
-  type CutGrid,
   type CutState,
-  type KnotNode,
   type KnotSettings,
 } from './types';
-import {
-  applyCut,
-  canCut,
-  computeCutDimensions,
-  isSameNode,
-  makeBetterRandomPattern,
-  makeEmptyPattern,
-  setBorderState,
-} from './pattern';
-import {
-  getClosestNode,
-  renderControlNodes,
-  renderCuts,
-  renderGrid,
-  renderKnotwork,
-} from './render';
+import { renderGrid } from './render';
+import { CutParityEngine } from './engines/cutParity';
+import type { EditorHit, EngineImageSize, KnotEngine } from './engines/types';
 
 export interface ImageDimensions {
   x: number;
@@ -35,19 +20,17 @@ export interface ImageDimensions {
 /**
  * A Celtic knot generator + pattern editor bound to one canvas.
  *
- * The pattern is a grid of "cuts" (breaks between strands). Each knot cell is
- * rendered from the two nearest cuts plus row/column parity. Users edit the
- * pattern by clicking control nodes to draw cuts between them.
+ * The editor owns the canvas, the `KnotSettings` and the export plumbing; the
+ * pattern itself lives behind a `KnotEngine`. Today there is exactly one
+ * engine (`cut-parity`: a grid of cuts between strands, edited through control
+ * nodes) but the seam is the point — a second engine plugs in without touching
+ * this class.
  */
 export class KnotEditor {
   private canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D;
   private settings: KnotSettings;
-  private cuts: CutGrid;
-  private cutRows = 0;
-  private cutColumns = 0;
-  private selectedNode: KnotNode | null = null;
-  private hoverNode: KnotNode | null = null;
+  private engine: CutParityEngine;
 
   constructor(canvas: HTMLCanvasElement, overrides: Partial<KnotSettings> = {}) {
     this.canvas = canvas;
@@ -57,11 +40,16 @@ export class KnotEditor {
     }
     this.ctx = ctx;
     this.settings = { ...DEFAULT_SETTINGS, ...overrides };
-    this.cuts = [];
+    this.engine = new CutParityEngine();
 
     this.setKnotworkSize(this.settings.rows, this.settings.columns);
     this.bindEvents();
     this.redraw();
+  }
+
+  /** The active engine. */
+  getEngine(): KnotEngine {
+    return this.engine;
   }
 
   // ---- events ----
@@ -85,15 +73,9 @@ export class KnotEditor {
     }
 
     const position = this.pageToCanvas(event.pageX, event.pageY);
-    let closest = getClosestNode(this.settings, position.x, position.y);
+    const hit = this.engine.hitTest(position.x, position.y, this.settings);
 
-    // While a node is selected, only nodes that can actually be cut to are valid targets.
-    if (closest !== null && this.selectedNode !== null && !canCut(this.selectedNode, closest)) {
-      closest = null;
-    }
-
-    if (!isSameNode(closest, this.hoverNode)) {
-      this.hoverNode = closest;
+    if (this.engine.updateHover(hit)) {
       this.redraw();
     }
   }
@@ -104,26 +86,8 @@ export class KnotEditor {
     }
 
     const position = this.pageToCanvas(event.pageX, event.pageY);
-    const closest = getClosestNode(this.settings, position.x, position.y);
-
-    if (closest !== null) {
-      if (isSameNode(this.selectedNode, closest)) {
-        // Clicking the selected node deselects it.
-        this.selectedNode = null;
-      } else if (this.selectedNode === null) {
-        this.selectedNode = closest;
-      } else if (canCut(this.selectedNode, closest)) {
-        applyCut(this.cuts, this.selectedNode, closest);
-        this.selectedNode = null;
-        this.hoverNode = null;
-      } else {
-        // Invalid target: just deselect.
-        this.selectedNode = null;
-      }
-    } else if (this.selectedNode !== null) {
-      // Empty space: deselect.
-      this.selectedNode = null;
-    }
+    const hit: EditorHit = this.engine.hitTest(position.x, position.y, this.settings);
+    this.engine.onClick(hit, this.settings);
 
     this.redraw();
   }
@@ -145,12 +109,8 @@ export class KnotEditor {
       renderGrid(ctx, s);
     }
 
-    renderKnotwork(ctx, s, this.cuts);
-
-    if (s.showUi) {
-      renderCuts(ctx, s, this.cuts);
-      renderControlNodes(ctx, s, this.selectedNode, this.hoverNode, canCut);
-    }
+    this.engine.render(ctx, s);
+    this.engine.renderOverlay(ctx, s, this.engine.ui);
 
     ctx.restore();
   }
@@ -158,16 +118,12 @@ export class KnotEditor {
   // ---- pattern operations ----
 
   resetPattern(): void {
-    this.cuts = makeEmptyPattern(this.cutRows, this.cutColumns);
-    this.selectedNode = null;
-    this.hoverNode = null;
+    this.engine.reset();
     this.redraw();
   }
 
-  randomizePattern(): void {
-    this.cuts = makeBetterRandomPattern(this.cutRows, this.cutColumns);
-    this.selectedNode = null;
-    this.hoverNode = null;
+  randomizePattern(seed?: number): void {
+    this.engine.randomize(seed);
     this.redraw();
   }
 
@@ -179,9 +135,7 @@ export class KnotEditor {
     this.settings.rows = rows;
     this.settings.columns = columns;
 
-    const { cutRows, cutColumns } = computeCutDimensions(rows, columns);
-    this.cutRows = cutRows;
-    this.cutColumns = cutColumns;
+    this.engine.resize(rows, columns);
 
     // Resize the canvas to fit, never below the initial 600x500.
     const canvasWidth = Math.max(OUTPUT_OFFSET.x + columns * this.settings.cellSize + 15, MIN_CANVAS_WIDTH);
@@ -189,11 +143,11 @@ export class KnotEditor {
     this.canvas.width = canvasWidth;
     this.canvas.height = canvasHeight;
 
-    this.resetPattern();
+    this.redraw();
   }
 
   setBorderState(state: 'open' | 'closed'): void {
-    setBorderState(this.cuts, state);
+    this.engine.setBorderState(state);
     this.redraw();
   }
 
@@ -292,11 +246,12 @@ export class KnotEditor {
 
   /** Pixel position and dimensions of the generated knot on the canvas. */
   getImageDimensions(): ImageDimensions {
+    const size = this.engine.imageSize(this.settings);
     return {
       x: OUTPUT_OFFSET.x,
       y: OUTPUT_OFFSET.y,
-      width: this.settings.columns * this.settings.cellSize,
-      height: this.settings.rows * this.settings.cellSize,
+      width: size.width,
+      height: size.height,
     };
   }
 
@@ -306,8 +261,9 @@ export class KnotEditor {
   private renderExportCanvas(): HTMLCanvasElement {
     const s = this.settings;
     const out = document.createElement('canvas');
-    out.width = s.columns * s.cellSize;
-    out.height = s.rows * s.cellSize;
+    const size: EngineImageSize = this.engine.imageSize(s);
+    out.width = size.width;
+    out.height = size.height;
     const ctx = out.getContext('2d');
     if (!ctx) {
       throw new Error('Export canvas 2D context unavailable');
@@ -315,7 +271,7 @@ export class KnotEditor {
 
     ctx.fillStyle = s.backgroundColor;
     ctx.fillRect(0, 0, out.width, out.height);
-    renderKnotwork(ctx, s, this.cuts);
+    this.engine.render(ctx, s);
 
     return out;
   }
@@ -349,10 +305,10 @@ export class KnotEditor {
 
   /** Current cut grid (read-only view for tests/debugging). */
   getCuts(): readonly (readonly CutState[])[] {
-    return this.cuts;
+    return this.engine.getCuts();
   }
 
   getCutValue(row: number, column: number): CutState {
-    return this.cuts[row][column];
+    return this.engine.getCutValue(row, column);
   }
 }

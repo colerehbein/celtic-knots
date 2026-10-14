@@ -31,6 +31,7 @@ export function makeEmptyPattern(cutRows: number, cutColumns: number): CutGrid {
  * @param totalCuts        how many random cuts to place (default 30% of cells)
  * @param bilateral        weight for left-right mirroring (default 50)
  * @param quadrilateral    weight for four-quadrant mirroring (default 50)
+ * @param random           RNG source (default Math.random); inject for seeded output
  */
 export function makeBetterRandomPattern(
   cutRows: number,
@@ -38,14 +39,15 @@ export function makeBetterRandomPattern(
   totalCuts = Math.floor(cutRows * cutColumns * 0.3),
   bilateral = 50,
   quadrilateral = 50,
+  random: () => number = Math.random,
 ): CutGrid {
   const states: CutState[] = [NO_CUT, VERT_CUT, HORIZ_CUT];
   const randomCuts = makeEmptyPattern(cutRows, cutColumns);
 
   for (let i = 0; i < totalCuts; i++) {
-    const row = Math.floor(Math.random() * cutRows);
+    const row = Math.floor(random() * cutRows);
     const maxColumns = row % 2 ? cutColumns : cutColumns - 1;
-    const column = Math.floor(Math.random() * maxColumns);
+    const column = Math.floor(random() * maxColumns);
 
     // Border rows can't hold vertical cuts; border columns can't hold horizontal ones.
     let possibleStates = states;
@@ -55,11 +57,11 @@ export function makeBetterRandomPattern(
       possibleStates = [NO_CUT, VERT_CUT];
     }
 
-    const newState = possibleStates[Math.floor(Math.random() * possibleStates.length)];
+    const newState = possibleStates[Math.floor(random() * possibleStates.length)];
     randomCuts[row][column] = newState;
 
     const mirrorColumn = maxColumns - column - 1;
-    if (Math.random() * (bilateral + quadrilateral) <= bilateral) {
+    if (random() * (bilateral + quadrilateral) <= bilateral) {
       randomCuts[row][mirrorColumn] = newState;
     } else {
       randomCuts[row][mirrorColumn] = newState;
