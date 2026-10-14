@@ -119,6 +119,17 @@ export interface KnotEngine {
 ## Phase 1 — Parallel new-file work (after T0; T2/T3 are T0-INDEPENDENT
 ## and may run in the same wave as T0)
 
+STATUS (2026-10-14): T0 ✓ committed (63800bb) · T1 ✓ committed (22288fc) ·
+T3 ✓ committed (d5b8cc2) · **T2 DEFERRED** — two subagent attempts died on
+it (first: concurrent-refactor confusion; second: response truncation after
+36 min of exploration of the curved-cross tile semantics, no files written).
+The port-connection model for the curved-cross tiles is genuinely subtle
+and needs empirical verification against rendered output. T2 is only on
+the critical path for T8 (per-strand coloring) — defer it to fresh
+context rather than burn a third attempt. Do NOT re-dispatch until the
+implementer has a tight, fully-derived spec (see strands.ts TODO below)
+or the parent writes it directly.
+
 ### T1 — Engine B: side-state model (Mueller algorithm, our code)
 
 **Files:** NEW `src/knot/engines/sideState.ts` + `src/knot/engines/sideState.test.ts`.
