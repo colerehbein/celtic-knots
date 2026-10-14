@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Celtic Knot Generator</title>
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <div id="wrapper">
+      <div id="header">
+        <h1>Celtic Knot Generator</h1>
+      </div>
+
+      <div id="editor-controls">
+        <fieldset id="tools">
+          <legend>Tools</legend>
+          <button type="button" id="reset-pattern">Reset pattern</button>
+          <button type="button" id="randomize-pattern">Randomize</button>
+          <br />
+          <button type="button" id="close-border">Close border</button>
+          <button type="button" id="open-border">Open border</button>
+        </fieldset>
+
+        <fieldset>
+          <legend>Grid size</legend>
+          <label>Width: <input type="text" id="grid-width" size="3" /></label>
+          <label>Height: <input type="text" id="grid-height" size="3" /></label>
+          <button type="button" id="set-grid-size">Apply</button>
+        </fieldset>
+
+        <fieldset id="settings">
+          <legend>Settings</legend>
+          <label><input type="checkbox" id="show-grid" checked /> Show grid</label>
+          <label>
+            Cell size:
+            <input type="range" id="cell-size" min="12" max="100" />
+            <span id="cell-size-num"></span> px
+          </label>
+          <label>
+            String size:
+            <input type="range" id="string-size" min="1" max="100" />
+            <span id="string-size-num"></span> px
+          </label>
+          <label>
+            Stroke width:
+            <input type="range" id="stroke-width" min="1" max="100" />
+            <span id="stroke-width-num"></span> px
+          </label>
+        </fieldset>
+
+        <fieldset id="colors">
+          <legend>Colors</legend>
+          <label>String color: <input type="color" id="string-color" /></label>
+          <label>Stroke color: <input type="color" id="stroke-color" /></label>
+          <label>Background: <input type="color" id="background-color" /></label>
+        </fieldset>
+
+        <fieldset id="downloads">
+          <legend>Download image</legend>
+          <button type="button" id="download-image">Download as PNG</button>
+        </fieldset>
+      </div>
+
+      <canvas id="knot-canvas" width="600" height="500"></canvas>
+
+      <div class="clear"></div>
+    </div>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
