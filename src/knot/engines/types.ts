@@ -77,6 +77,15 @@ export interface KnotEngine {
   /** Change the knot dimensions (must keep settings.rows/columns in sync). */
   resize(rows: number, columns: number): void;
 
+  /**
+   * The knotwork dimensions this engine's pattern currently occupies.
+   *
+   * A restored pattern carries its own grid size, so whoever deserializes it
+   * needs to learn what that size is in order to resize anything that renders
+   * or lays out through `settings` (the canvas above all).
+   */
+  getDimensions(): { rows: number; columns: number };
+
   /** Open or close the knot's borders. */
   setBorderState(state: 'open' | 'closed'): void;
 

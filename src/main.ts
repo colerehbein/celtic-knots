@@ -1,4 +1,5 @@
 import { KnotEditor, type EngineId, type ExportScale } from './knot/editor';
+import { composeShareLink, parseShareLink } from './knot/shareLink';
 
 const editor = new KnotEditor(document.getElementById('knot-canvas') as HTMLCanvasElement);
 
@@ -101,6 +102,30 @@ $('download-image').addEventListener('click', () => {
   void editor.downloadPNG('celtic-knot.png', readExportScale());
 });
 
+// ---- share links ----
+
+/**
+ * Copy a link that restores this exact pattern into the clipboard.
+ *
+ * The link is built from `location.href` with any existing fragment stripped
+ * (see `composeShareLink`), so pressing the button twice never stacks hashes.
+ * The clipboard API is unavailable over plain http and in some embedded
+ * webviews, so a missing or failing `navigator.clipboard` degrades to a
+ * silent no-op — the pattern is on screen either way, and an unhandled
+ * rejection in a click handler is a worse outcome than a copy that didn't
+ * happen.
+ */
+$('share-link').addEventListener('click', () => {
+  const link = composeShareLink(location.href, editor.getEngineId(), editor.getPattern());
+  const clipboard = navigator.clipboard;
+  if (clipboard === undefined || typeof clipboard.writeText !== 'function') {
+    return;
+  }
+  void clipboard.writeText(link).catch(() => {
+    // Clipboard write refused (permissions, insecure context): nothing to do.
+  });
+});
+
 // ---- keyboard shortcuts ----
 
 /**
@@ -178,7 +203,31 @@ document.addEventListener('keydown', (event) => {
   }
 });
 
-// Start with a random knot so the canvas isn't empty on load.
-editor.randomizePattern();
+// ---- share-link load ----
+
+/**
+ * Restore the pattern the URL asks for, if it carries a valid share link.
+ *
+ * Returns true when a pattern was loaded. Opt-in by construction: with no
+ * hash — or a malformed one — this does nothing at all and the caller runs
+ * the ordinary fresh-startup randomize, so a broken link degrades to 1.0
+ * behaviour instead of an empty or half-loaded canvas.
+ */
+function loadSharedPattern(): boolean {
+  if (typeof location === 'undefined') {
+    return false;
+  }
+  const shared = parseShareLink(location.hash);
+  if (shared === null) {
+    return false;
+  }
+  editor.loadPattern(shared.engineId, shared.pattern);
+  return true;
+}
+
+if (!loadSharedPattern()) {
+  // Start with a random knot so the canvas isn't empty on load.
+  editor.randomizePattern();
+}
 syncControls();
 syncEngineSelect();

@@ -13,6 +13,7 @@ import {
   renderCuts,
   renderKnotwork,
 } from '../render';
+import { mulberry32 } from '../rng';
 import type { CutGrid, CutState, KnotNode, KnotSettings } from '../types';
 import type { EditorHit, EditorUiState, EngineImageSize, KnotEngine } from './types';
 
@@ -21,18 +22,6 @@ interface CutParitySnapshot {
   cutRows: number;
   cutColumns: number;
   cuts: CutState[][];
-}
-
-/** Deterministic PRNG so `randomize(seed)` is repeatable across runs. */
-function mulberry32(seed: number): () => number {
-  let a = seed >>> 0;
-  return () => {
-    a = (a + 0x6d2b79f5) >>> 0;
-    let t = a;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
 }
 
 function isCutState(value: unknown): value is CutState {
@@ -72,6 +61,17 @@ export class CutParityEngine implements KnotEngine {
     this.cuts = makeEmptyPattern(cutRows, cutColumns);
     this.selectedNode = null;
     this.hoverNode = null;
+  }
+
+  /**
+   * Knotwork dimensions these cuts were built for — the inverse of
+   * `computeCutDimensions`, so a restored pattern can report its own size.
+   */
+  getDimensions(): { rows: number; columns: number } {
+    return {
+      rows: this.cutRows - 1,
+      columns: (this.cutColumns - 1) * 2,
+    };
   }
 
   /** Open or close the knot's borders in place. */

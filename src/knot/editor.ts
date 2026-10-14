@@ -110,6 +110,48 @@ export class KnotEditor {
   }
 
   /**
+   * The active engine's pattern, as an opaque snapshot. This is what a share
+   * link carries; `loadPattern` is its inverse.
+   */
+  getPattern(): unknown {
+    return this.engine.serialize();
+  }
+
+  /**
+   * Restore a pattern captured by `getPattern()` onto the named engine.
+   *
+   * Used by share-link loading, so `engineId` arrives as an untrusted string
+   * and is validated here: an unknown id is a no-op rather than a crash. The
+   * engine switch happens before the deserialize, so a bad pattern lands on
+   * the right engine and — since `deserialize` resets on malformed input —
+   * worst case shows that engine's empty grid rather than breaking the page.
+   *
+   * A pattern carries its own grid size, and the renderer reads the grid
+   * through `settings`, so the editor's dimensions follow the loaded pattern.
+   * Without this a link from a 4x8 knot would render a 12x12 grid against a
+   * 4x8 set of cuts and index past the end of it.
+   */
+  loadPattern(engineId: string, pattern: unknown): void {
+    if (engineId !== 'cut-parity' && engineId !== 'side-state') {
+      return;
+    }
+    if (engineId !== this.engine.id) {
+      this.setEngine(engineId);
+    }
+    this.engine.deserialize(pattern);
+
+    const { rows, columns } = this.engine.getDimensions();
+    if (rows !== this.settings.rows || columns !== this.settings.columns) {
+      this.settings.rows = rows;
+      this.settings.columns = columns;
+      this.engineSizes.set(this.engine.id, { rows, columns });
+      this.resizeCanvas();
+    }
+
+    this.redraw();
+  }
+
+  /**
    * Switch the active engine.
    *
    * Each engine is instantiated once and kept in `engines`, so the pattern the
@@ -307,13 +349,16 @@ export class KnotEditor {
     // new grid.
     this.engineSizes.set(this.engine.id, { rows, columns });
 
-    // Resize the canvas to fit, never below the initial 600x500.
-    const canvasWidth = Math.max(OUTPUT_OFFSET.x + columns * this.settings.cellSize + 15, MIN_CANVAS_WIDTH);
-    const canvasHeight = Math.max(OUTPUT_OFFSET.y + rows * this.settings.cellSize + 15, MIN_CANVAS_HEIGHT);
+    this.resizeCanvas();
+    this.redraw();
+  }
+
+  /** Size the canvas to fit the current grid, never below the initial 600x500. */
+  private resizeCanvas(): void {
+    const canvasWidth = Math.max(OUTPUT_OFFSET.x + this.settings.columns * this.settings.cellSize + 15, MIN_CANVAS_WIDTH);
+    const canvasHeight = Math.max(OUTPUT_OFFSET.y + this.settings.rows * this.settings.cellSize + 15, MIN_CANVAS_HEIGHT);
     this.canvas.width = canvasWidth;
     this.canvas.height = canvasHeight;
-
-    this.redraw();
   }
 
   setBorderState(state: 'open' | 'closed'): void {

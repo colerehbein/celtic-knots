@@ -1,3 +1,4 @@
+import { mulberry32 } from '../rng';
 import type { EditorHit, EditorUiState, EngineImageSize, KnotEngine } from './types';
 import type { KnotSettings } from '../types';
 
@@ -106,18 +107,6 @@ interface SideStateSnapshot {
  */
 const BILATERAL_WEIGHT = 50;
 const QUADRILATERAL_WEIGHT = 50;
-
-/** Deterministic PRNG so `randomize(seed)` is repeatable across runs. */
-function mulberry32(seed: number): () => number {
-  let a = seed >>> 0;
-  return () => {
-    a = (a + 0x6d2b79f5) >>> 0;
-    let t = a;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
 
 // ---------------------------------------------------------------------------
 // Geometry — every list below is transcribed from the reference .pde
@@ -375,6 +364,11 @@ export class SideStateEngine implements KnotEngine {
     this.rows = Math.max(0, Math.floor(rows));
     this.columns = Math.max(0, Math.floor(columns));
     this.sides = makeEmptySides(this.rows, this.columns);
+  }
+
+  /** Current knotwork dimensions of the sides grid. */
+  getDimensions(): { rows: number; columns: number } {
+    return { rows: this.rows, columns: this.columns };
   }
 
   /**
