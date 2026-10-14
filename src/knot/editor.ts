@@ -29,6 +29,35 @@ export type ExportScale = 1 | 2 | 4;
 export type EngineId = 'cut-parity' | 'side-state';
 
 /**
+ * A named grid + cell-size combination sized to hit an exact pixel target.
+ *
+ * Every preset uses an integer cell size (no fractional scaling, so the
+ * knot renders crisply at 1x) and even grid dimensions — `setKnotworkSize`
+ * silently rounds odd ones up, which would break the pixel math below.
+ *
+ * `a4-300dpi` is the one approximate target: A4 at 300dpi is 2480x3508, and
+ * 2480 = 62 * 40 exactly while 3508 / 40 = 87.7. Rounding the height up to
+ * the nearest even grid (88 rows) yields 3520px, 12px taller than true A4
+ * (+0.34%) with the width dead on. 31px cells would have fit the height more
+ * closely (113 rows -> 3503) but 113 is odd, so the even-grid rule pushes it
+ * to 114 rows -> 3534, a worse miss.
+ */
+export interface SizePreset {
+  id: string;
+  label: string;
+  rows: number;
+  columns: number;
+  cellSize: number;
+}
+
+/** Presets offered by the "Size presets" buttons; ids double as element ids. */
+export const SIZE_PRESETS: readonly SizePreset[] = [
+  { id: 'icon-512', label: 'Icon 512', rows: 16, columns: 16, cellSize: 32 },
+  { id: 'banner-1400x300', label: 'Banner', rows: 6, columns: 28, cellSize: 50 },
+  { id: 'a4-300dpi', label: 'A4 300dpi', rows: 88, columns: 62, cellSize: 40 },
+];
+
+/**
  * Pixels of pointer travel that still count as a plain click rather than a
  * drag. Real hands jitter a few pixels between press and release; without a
  * threshold that noise would turn every click into a spurious drag-cut.
@@ -351,6 +380,22 @@ export class KnotEditor {
 
     this.resizeCanvas();
     this.redraw();
+  }
+
+  /**
+   * Apply a named size preset (`SIZE_PRESETS`): grid dimensions plus cell
+   * size in one shot. Cell size is applied first so `setKnotworkSize`'s
+   * canvas resize inside `setCellSize` happens at the preset's scale.
+   * Returns false for an unknown id, leaving the editor untouched.
+   */
+  applySizePreset(id: string): boolean {
+    const preset = SIZE_PRESETS.find((candidate) => candidate.id === id);
+    if (preset === undefined) {
+      return false;
+    }
+    this.setCellSize(preset.cellSize);
+    this.setKnotworkSize(preset.rows, preset.columns);
+    return true;
   }
 
   /** Size the canvas to fit the current grid, never below the initial 600x500. */

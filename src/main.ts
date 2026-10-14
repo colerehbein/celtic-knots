@@ -1,4 +1,4 @@
-import { KnotEditor, type EngineId, type ExportScale } from './knot/editor';
+import { KnotEditor, SIZE_PRESETS, type EngineId, type ExportScale } from './knot/editor';
 import { composeShareLink, parseShareLink } from './knot/shareLink';
 import { parseFile, serializeToFile } from './knot/saveLoad';
 
@@ -57,6 +57,24 @@ $('set-grid-size').addEventListener('click', () => {
     syncControls();
   }
 });
+
+// ---- size presets ----
+//
+// Each button maps to one entry of SIZE_PRESETS and is wired by its derived
+// id (`preset-<id>`) rather than a querySelectorAll sweep, so every preset
+// in the list gets a button by construction and the click handler is the
+// same three lines for all of them.
+
+for (const preset of SIZE_PRESETS) {
+  $(`preset-${preset.id}`).addEventListener('click', () => {
+    // An unknown id is impossible here (the ids come from the list itself),
+    // but the boolean is respected rather than assumed: a preset that didn't
+    // apply must not resync the controls and make the UI lie.
+    if (editor.applySizePreset(preset.id)) {
+      syncControls();
+    }
+  });
+}
 
 $<HTMLInputElement>('show-grid').addEventListener('change', (event) => {
   editor.showGrid((event.target as HTMLInputElement).checked);
