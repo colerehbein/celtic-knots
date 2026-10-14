@@ -32,16 +32,33 @@ export function getVisualNodeCenter(s: KnotSettings, row: number, column: number
   return { x, y };
 }
 
-/** Draw the knotwork itself: one tile per cell, selected by cuts + parity. */
-export function renderKnotwork(ctx: CanvasRenderingContext2D, s: KnotSettings, cuts: CutGrid): void {
+/**
+ * Draw the knotwork itself: one tile per cell, selected by cuts + parity.
+ *
+ * `revealCells` limits the draw to the first N cells of the loop's natural
+ * order (columns outer, rows inner) — the self-drawing animation's reveal
+ * budget. Omitted draws every cell.
+ */
+export function renderKnotwork(
+  ctx: CanvasRenderingContext2D,
+  s: KnotSettings,
+  cuts: CutGrid,
+  revealCells?: number,
+): void {
   ctx.lineCap = 'square';
   ctx.lineJoin = 'round';
   ctx.fillStyle = s.stringColor;
   ctx.strokeStyle = s.strokeColor;
   ctx.lineWidth = s.strokeWidth;
 
+  let drawn = 0;
   for (let x = 0; x < s.columns; x++) {
     for (let y = 0; y < s.rows; y++) {
+      if (revealCells !== undefined && drawn >= revealCells) {
+        return;
+      }
+      drawn++;
+
       ctx.save();
       ctx.translate(x * s.cellSize, y * s.cellSize);
 

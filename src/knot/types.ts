@@ -40,6 +40,14 @@ export interface KnotSettings {
    */
   glow: boolean;
 
+  /**
+   * Self-drawing animation: `randomizePattern` reveals the new pattern
+   * cell by cell instead of painting it at once. Off by default, and a
+   * no-op for users who asked for reduced motion — with it off (or under
+   * reduced motion) a randomize is the instant full render it always was.
+   */
+  animate: boolean;
+
   controlNodeSize: number;
   selectedControlNodeSize: number;
 }
@@ -65,6 +73,8 @@ export const DEFAULT_SETTINGS: KnotSettings = {
   showUi: true,
 
   glow: false,
+
+  animate: false,
 
   controlNodeSize: 5,
   selectedControlNodeSize: 12,

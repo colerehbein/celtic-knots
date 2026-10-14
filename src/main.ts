@@ -97,6 +97,10 @@ $<HTMLInputElement>('glow').addEventListener('change', (event) => {
   editor.showGlow((event.target as HTMLInputElement).checked);
 });
 
+$<HTMLInputElement>('animate').addEventListener('change', (event) => {
+  editor.showAnimation((event.target as HTMLInputElement).checked);
+});
+
 $('cell-size').addEventListener('input', (event) => {
   editor.setCellSize(parseInt((event.target as HTMLInputElement).value, 10));
   syncControls();

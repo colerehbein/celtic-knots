@@ -105,11 +105,11 @@ export class CutParityEngine implements KnotEngine {
 
   // ---- KnotEngine ----
 
-  render(ctx: CanvasRenderingContext2D, settings: KnotSettings): void {
+  render(ctx: CanvasRenderingContext2D, settings: KnotSettings, revealCells?: number): void {
     // The glow brackets the knotwork only: `renderOverlay` (cut markers,
     // control nodes) runs after this returns, so its strokes get no halo.
     beginGlow(ctx, settings);
-    renderKnotwork(ctx, settings, this.cuts);
+    renderKnotwork(ctx, settings, this.cuts, revealCells);
     endGlow(ctx, settings);
   }
 

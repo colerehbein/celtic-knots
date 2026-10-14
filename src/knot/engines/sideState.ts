@@ -410,7 +410,7 @@ export class SideStateEngine implements KnotEngine {
 
   // ---- KnotEngine ----
 
-  render(ctx: CanvasRenderingContext2D, settings: KnotSettings): void {
+  render(ctx: CanvasRenderingContext2D, settings: KnotSettings, revealCells?: number): void {
     const s = settings.cellSize;
 
     ctx.lineCap = 'square';
@@ -422,12 +422,20 @@ export class SideStateEngine implements KnotEngine {
     // Glow brackets the draw loop only, so `renderOverlay`'s lattice and
     // the editor's grid never pick up the halo.
     beginGlow(ctx, settings);
+    let drawn = 0;
     for (let row = 0; row < this.rows; row++) {
       for (let column = 0; column < this.columns; column++) {
+        if (revealCells !== undefined && drawn >= revealCells) {
+          break;
+        }
+        drawn++;
         ctx.save();
         ctx.translate(column * s, row * s);
         this.drawSquare(ctx, this.sides[row][column], s);
         ctx.restore();
+      }
+      if (revealCells !== undefined && drawn >= revealCells) {
+        break;
       }
     }
     endGlow(ctx, settings);

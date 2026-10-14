@@ -40,8 +40,16 @@ export interface KnotEngine {
   readonly id: 'cut-parity' | 'side-state';
   readonly name: string;
 
-  /** Draw the knot itself, with no editor overlay. */
-  render(ctx: CanvasRenderingContext2D, settings: KnotSettings): void;
+  /**
+   * Draw the knot itself, with no editor overlay.
+   *
+   * `revealCells` is the self-drawing animation's reveal budget: when given,
+   * the engine draws only the first `revealCells` cells of its own natural
+   * iteration order (cut-parity: columns outer, rows inner; side-state: its
+   * own row/column order). Omitted or undefined draws every cell — the
+   * behaviour this interface had before the parameter existed.
+   */
+  render(ctx: CanvasRenderingContext2D, settings: KnotSettings, revealCells?: number): void;
 
   /** Replace the pattern with a fresh random one. `seed` makes it repeatable. */
   randomize(seed?: number): void;

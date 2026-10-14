@@ -6,6 +6,7 @@ import {
   type KnotSettings,
 } from './types';
 import { renderGrid } from './render';
+import { REVEAL_PER_CELL_MS, prefersReducedMotion, revealSchedule } from './reveal';
 import { CutParityEngine } from './engines/cutParity';
 import { SideStateEngine } from './engines/sideState';
 import { UndoStack } from './undo';
@@ -109,6 +110,15 @@ export class KnotEditor {
    * tell a plain click from a drag.
    */
   private gesture: { pointerId: number; hit: EditorHit | null; pageX: number; pageY: number } | null = null;
+
+  /**
+   * Pending requestAnimationFrame handle for a reveal in flight, or null
+   * when the pattern is showing in full. The reveal draws only through
+   * `redraw(revealCells)`; any full redraw cancels it, so a pointer click,
+   * an undo or another randomize during the animation snaps to the
+   * complete pattern instead of fighting the frames.
+   */
+  private revealFrame: number | null = null;
 
   constructor(canvas: HTMLCanvasElement, overrides: Partial<KnotSettings> = {}) {
     this.canvas = canvas;
@@ -330,7 +340,24 @@ export class KnotEditor {
 
   // ---- rendering ----
 
-  redraw(): void {
+  /**
+   * Cancel a reveal in flight and paint the whole pattern. Called by every
+   * full redraw — including the one a pointer click or undo triggers — so
+   * the animation can never keep half-drawing over newer state.
+   */
+  private cancelReveal(): void {
+    if (this.revealFrame !== null) {
+      if (typeof cancelAnimationFrame === 'function') {
+        cancelAnimationFrame(this.revealFrame);
+      }
+      this.revealFrame = null;
+    }
+  }
+
+  redraw(revealCells?: number): void {
+    if (revealCells === undefined) {
+      this.cancelReveal();
+    }
     const ctx = this.ctx;
     const s = this.settings;
 
@@ -345,7 +372,7 @@ export class KnotEditor {
       renderGrid(ctx, s);
     }
 
-    this.engine.render(ctx, s);
+    this.engine.render(ctx, s, revealCells);
     this.engine.renderOverlay(ctx, s, this.engine.ui);
 
     ctx.restore();
@@ -362,7 +389,79 @@ export class KnotEditor {
   randomizePattern(seed?: number): void {
     this.undoStack.record(this.engine.serialize());
     this.engine.randomize(seed);
+
+    // The pattern is final from this instant — undo, serialize and the
+    // pointer handlers all see the complete knot. The animation is purely
+    // a reveal of what is already there, so nothing downstream has to know
+    // it is running.
+    if (this.shouldAnimateRandomize()) {
+      this.startReveal();
+      return;
+    }
     this.redraw();
+  }
+
+  /** Cells the current grid occupies — the reveal budget's denominator. */
+  getTotalCells(): number {
+    return this.settings.rows * this.settings.columns;
+  }
+
+  /** Turn the self-drawing animation on or off. Default off. */
+  showAnimation(on: boolean): void {
+    this.settings.animate = on;
+    if (!on) {
+      // Turning the toggle off mid-reveal finishes it: the pattern is
+      // already complete, so paint it rather than freeze a half-drawn one.
+      this.redraw();
+    }
+  }
+
+  isAnimatingEnabled(): boolean {
+    return this.settings.animate;
+  }
+
+  /**
+   * True only when every guard agrees: the toggle is on, the user has not
+   * asked for reduced motion, and this is actually a browser (Node has no
+   * requestAnimationFrame, so tests must never enter the animation path).
+   */
+  private shouldAnimateRandomize(): boolean {
+    return (
+      this.settings.animate &&
+      !prefersReducedMotion() &&
+      typeof requestAnimationFrame === 'function'
+    );
+  }
+
+  /**
+   * Reveal the already-randomized pattern cell by cell.
+   *
+   * Each frame recomputes the schedule from the elapsed time rather than
+   * counting frames, so a dropped or throttled frame only changes the
+   * tempo, never the total. The final frame is a full redraw, which also
+   * cancels the pending handle.
+   */
+  private startReveal(): void {
+    const total = this.getTotalCells();
+    if (total <= 0) {
+      this.redraw();
+      return;
+    }
+
+    const start = performance.now();
+    const step = (): void => {
+      const elapsed = performance.now() - start;
+      const visible = revealSchedule(total, REVEAL_PER_CELL_MS, elapsed);
+      if (visible >= total) {
+        this.revealFrame = null;
+        this.redraw();
+        return;
+      }
+      this.redraw(visible);
+      this.revealFrame = requestAnimationFrame(step);
+    };
+
+    this.revealFrame = requestAnimationFrame(step);
   }
 
   setKnotworkSize(rows: number, columns: number): void {
