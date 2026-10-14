@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="Celtic knot">
+  <rect width="512" height="512" fill="#ffffff" />
+  <g fill="none" stroke="#ff9a39" stroke-width="44" stroke-linecap="butt">
+    <!-- A 2x2 plait: every crossing breaks exactly one of the two strokes,
+         so the weave reads as interlaced rather than overlapping. -->
+    <path d="M 96 160 H 416" stroke-dasharray="90 44 48 44 94" />
+    <path d="M 96 352 H 416" />
+    <path d="M 208 96 V 416" stroke-dasharray="234 44 42" />
+    <path d="M 304 96 V 416" stroke-dasharray="42 44 234" />
+  </g>
+</svg>

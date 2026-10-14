@@ -1,6 +1,7 @@
 import { KnotEditor, SIZE_PRESETS, type EngineId, type ExportScale } from './knot/editor';
 import { composeShareLink, parseShareLink } from './knot/shareLink';
 import { parseFile, serializeToFile } from './knot/saveLoad';
+import { shouldRegisterServiceWorker } from './knot/pwa';
 import {
   CAPTURE_FRAME_RATE,
   RECORDING_MIME_TYPE,
@@ -421,3 +422,21 @@ if (!loadSharedPattern()) {
 }
 syncControls();
 syncEngineSelect();
+
+// ---- service worker (PWA) ----
+//
+// Registered last, and only when the page can actually host one: a
+// serviceWorker on a file:// page is refused by every browser, and the
+// single-file build is meant to open straight from disk, so the guard
+// (not a try/catch) is what keeps that path untouched. The register()
+// promise is still caught — insecure-context or permission failures
+// shouldn't surface as an unhandled rejection in an app that works fine
+// without the offline cache.
+if (
+  typeof location !== 'undefined' &&
+  shouldRegisterServiceWorker(location) &&
+  typeof navigator !== 'undefined' &&
+  'serviceWorker' in navigator
+) {
+  navigator.serviceWorker.register('./sw.js').catch(() => {});
+}

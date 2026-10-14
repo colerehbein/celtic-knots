@@ -30,6 +30,11 @@ jobs:
           # everything (CSS + JS) is already inlined, so it deploys as-is.
           cp celtic-knots.html _site/index.html
           cp CNAME _site/CNAME
+          # PWA assets: manifest, icon and the cache-first service worker.
+          # public/ is vite's static dir, so these deploy unmodified.
+          cp public/manifest.webmanifest _site/manifest.webmanifest
+          cp public/sw.js _site/sw.js
+          cp public/icon.svg _site/icon.svg
 
       - uses: actions/configure-pages@v5
 

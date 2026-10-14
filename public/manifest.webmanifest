@@ -1,0 +1,19 @@
+{
+  "name": "Celtic Knot Generator",
+  "short_name": "Celtic Knots",
+  "description": "Draw, weave and export Celtic knotwork on a grid.",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#ffffff",
+  "theme_color": "#ff9a39",
+  "icons": [
+    {
+      "src": "./icon.svg",
+      "type": "image/svg+xml",
+      "sizes": "any",
+      "purpose": "any maskable"
+    }
+  ]
+}
