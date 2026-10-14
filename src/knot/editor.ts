@@ -3,11 +3,11 @@ import {
   MIN_CANVAS_HEIGHT,
   MIN_CANVAS_WIDTH,
   OUTPUT_OFFSET,
-  type CutState,
   type KnotSettings,
 } from './types';
 import { renderGrid } from './render';
 import { CutParityEngine } from './engines/cutParity';
+import { UndoStack } from './undo';
 import type { EditorHit, EngineImageSize, KnotEngine } from './engines/types';
 
 export interface ImageDimensions {
@@ -30,7 +30,8 @@ export class KnotEditor {
   private canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D;
   private settings: KnotSettings;
-  private engine: CutParityEngine;
+  private engine: KnotEngine;
+  private readonly undoStack = new UndoStack<unknown>();
 
   constructor(canvas: HTMLCanvasElement, overrides: Partial<KnotSettings> = {}) {
     this.canvas = canvas;
@@ -86,8 +87,15 @@ export class KnotEditor {
     }
 
     const position = this.pageToCanvas(event.pageX, event.pageY);
-    const hit: EditorHit = this.engine.hitTest(position.x, position.y, this.settings);
+    const hit: EditorHit | null = this.engine.hitTest(position.x, position.y, this.settings);
+    const snapshot = this.engine.serialize();
     this.engine.onClick(hit, this.settings);
+    // Only clicks that actually cut/erased a strand are undoable — a pure
+    // select/deselect is transient UI state, not a pattern mutation.
+    // Compare serialized state so this works for any engine.
+    if (JSON.stringify(this.engine.serialize()) !== JSON.stringify(snapshot)) {
+      this.undoStack.record(snapshot);
+    }
 
     this.redraw();
   }
@@ -118,11 +126,13 @@ export class KnotEditor {
   // ---- pattern operations ----
 
   resetPattern(): void {
+    this.undoStack.record(this.engine.serialize());
     this.engine.reset();
     this.redraw();
   }
 
   randomizePattern(seed?: number): void {
+    this.undoStack.record(this.engine.serialize());
     this.engine.randomize(seed);
     this.redraw();
   }
@@ -147,6 +157,7 @@ export class KnotEditor {
   }
 
   setBorderState(state: 'open' | 'closed'): void {
+    this.undoStack.record(this.engine.serialize());
     this.engine.setBorderState(state);
     this.redraw();
   }
@@ -157,6 +168,38 @@ export class KnotEditor {
 
   openBorder(): void {
     this.setBorderState('open');
+  }
+
+  // ---- undo / redo ----
+
+  /** Step the pattern back one state. Returns false when there is nothing to undo. */
+  undo(): boolean {
+    const previous = this.undoStack.undo(this.engine.serialize());
+    if (previous === null) {
+      return false;
+    }
+    this.engine.deserialize(previous);
+    this.redraw();
+    return true;
+  }
+
+  /** Step the pattern forward one state. Returns false when there is nothing to redo. */
+  redo(): boolean {
+    const next = this.undoStack.redo(this.engine.serialize());
+    if (next === null) {
+      return false;
+    }
+    this.engine.deserialize(next);
+    this.redraw();
+    return true;
+  }
+
+  canUndo(): boolean {
+    return this.undoStack.canUndo();
+  }
+
+  canRedo(): boolean {
+    return this.undoStack.canRedo();
   }
 
   showUi(show: boolean): void {
@@ -301,14 +344,5 @@ export class KnotEditor {
     link.click();
     link.remove();
     URL.revokeObjectURL(url);
-  }
-
-  /** Current cut grid (read-only view for tests/debugging). */
-  getCuts(): readonly (readonly CutState[])[] {
-    return this.engine.getCuts();
-  }
-
-  getCutValue(row: number, column: number): CutState {
-    return this.engine.getCutValue(row, column);
   }
 }

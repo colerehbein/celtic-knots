@@ -76,6 +76,35 @@ $('download-image').addEventListener('click', () => {
   void editor.downloadPNG();
 });
 
+// ---- undo/redo keyboard shortcuts ----
+
+document.addEventListener('keydown', (event) => {
+  if (!event.metaKey && !event.ctrlKey) {
+    return;
+  }
+  if (event.altKey) {
+    return;
+  }
+
+  // Don't hijack typing in text fields (grid width/height, etc.).
+  const target = event.target;
+  if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || (target instanceof HTMLElement && target.isContentEditable)) {
+    return;
+  }
+
+  const key = event.key.toLowerCase();
+  if (key !== 'z' && key !== 'y') {
+    return;
+  }
+
+  event.preventDefault();
+  if (key === 'y' || (key === 'z' && event.shiftKey)) {
+    editor.redo();
+  } else {
+    editor.undo();
+  }
+});
+
 // Start with a random knot so the canvas isn't empty on load.
 editor.randomizePattern();
 syncControls();

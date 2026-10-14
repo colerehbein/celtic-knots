@@ -212,8 +212,8 @@ export class CutParityEngine implements KnotEngine {
   }
 
   /** Select / deselect / apply-cut state machine, driven by one click. */
-  onClick(hit: EditorHit, _settings: KnotSettings): void {
-    const closest = hit.node;
+  onClick(hit: EditorHit | null, _settings: KnotSettings): void {
+    const closest = hit === null ? null : hit.node;
 
     if (closest !== null) {
       if (isSameNode(this.selectedNode, closest)) {

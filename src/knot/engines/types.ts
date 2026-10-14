@@ -62,11 +62,30 @@ export interface KnotEngine {
   renderOverlay(ctx: CanvasRenderingContext2D, settings: KnotSettings, ui: EditorUiState): void;
 
   /**
+   * Engine-owned editor UI state (selection/hover), read by the shell for
+   * overlay rendering. Engines whose editing model has no selection
+   * concept may report a constant empty state.
+   */
+  readonly ui: EditorUiState;
+
+  /**
+   * Push a hover hit into the engine. Returns true when the visible hover
+   * state changed and the caller should redraw.
+   */
+  updateHover(hit: EditorHit | null): boolean;
+
+  /** Change the knot dimensions (must keep settings.rows/columns in sync). */
+  resize(rows: number, columns: number): void;
+
+  /** Open or close the knot's borders. */
+  setBorderState(state: 'open' | 'closed'): void;
+
+  /**
    * Resolve a canvas point (OUTPUT_OFFSET already subtracted) to a hit.
    * Returns null when the engine's pointer space has no notion of a hit here.
    */
   hitTest(x: number, y: number, settings: KnotSettings): EditorHit | null;
 
   /** Apply a click on `hit` to the engine's state machine. */
-  onClick(hit: EditorHit, settings: KnotSettings): void;
+  onClick(hit: EditorHit | null, settings: KnotSettings): void;
 }

@@ -390,7 +390,7 @@ export class SideStateEngine implements KnotEngine {
   }
 
   /** Open or close the knot's borders in place. */
-  setBorder(state: 'open' | 'closed'): void {
+  setBorderState(state: 'open' | 'closed'): void {
     if (this.rows === 0 || this.columns === 0) {
       return;
     }
@@ -601,6 +601,24 @@ export class SideStateEngine implements KnotEngine {
   }
 
   /**
+   * This engine's editing model has no selection concept — clicking an
+   * edge applies immediately — so the UI state is a constant empty state
+   * and the overlay (lattice only) never reads it.
+   */
+  get ui(): EditorUiState {
+    return { selectedNode: null, hoverNode: null };
+  }
+
+  /**
+   * Hover drives no rendering in this engine (the overlay is lattice-only
+   * and edges are click-applied, not previewed), so this always reports
+   * "unchanged" and the shell skips the redraw.
+   */
+  updateHover(_hit: EditorHit | null): boolean {
+    return false;
+  }
+
+  /**
    * Nearest-lattice-line rule from the reference's `mousePressed`
    * (lines 45-84): round to the nearest lattice crossing, then whichever
    * axis is nearer decides the edge orientation. Returns null outside the
@@ -634,7 +652,10 @@ export class SideStateEngine implements KnotEngine {
    * (border edges), matching the reference's `if (i > 0)` / `if (i < w)`
    * guards at lines 56-66 and 72-82.
    */
-  onClick(hit: EditorHit, _settings: KnotSettings): void {
+  onClick(hit: EditorHit | null, _settings: KnotSettings): void {
+    if (hit === null) {
+      return;
+    }
     const edge = asEdgeHit(hit);
     if (edge === null) {
       return;

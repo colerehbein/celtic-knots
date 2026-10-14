@@ -486,7 +486,7 @@ describe('setBorder', () => {
   it('closes the border: every border side back to 0', () => {
     const engine = new SideStateEngine(4, 4);
     engine.randomize(7);
-    engine.setBorder('closed');
+    engine.setBorderState('closed');
 
     const sides = engine.getSides();
     for (let column = 0; column < 4; column++) {
@@ -501,7 +501,7 @@ describe('setBorder', () => {
 
   it('opens the border: every border side straight', () => {
     const engine = new SideStateEngine(4, 4);
-    engine.setBorder('open');
+    engine.setBorderState('open');
 
     const sides = engine.getSides();
     for (let column = 0; column < 4; column++) {
